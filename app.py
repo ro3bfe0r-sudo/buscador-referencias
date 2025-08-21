@@ -12,6 +12,21 @@ st.set_page_config(
 )
 
 # -----------------------------
+# CSS para estilo corporativo
+# -----------------------------
+st.markdown("""
+    <style>
+    body {
+        background-color: #0072C6;  /* azul corporativo */
+        color: white;
+    }
+    .stDataFrame tbody tr th {color: black;}
+    .stDataFrame tbody tr td {color: black;}
+    .stDataFrame thead tr th {color: black;}
+    </style>
+""", unsafe_allow_html=True)
+
+# -----------------------------
 # Nombre del Excel y columnas
 # -----------------------------
 FILE_NAME = "BBDD REFERENCIAS 2025 AGOSTO.xlsx"
@@ -19,7 +34,8 @@ columnas_seleccionadas = [
     "OEE Second Item Number",
     "Catalog Description",
     "List Price ES",
-    "Stocking Type"
+    "Stocking Type",
+    "Primary Image Deep Link"
 ]
 
 # -----------------------------
@@ -30,6 +46,15 @@ def load_data():
     return pd.read_excel(FILE_NAME, usecols=columnas_seleccionadas)
 
 df = load_data()
+
+# -----------------------------
+# Cabecera con logo
+# -----------------------------
+col1, col2 = st.columns([1,6])
+with col1:
+    st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/5/52/Omron_logo.svg/2560px-Omron_logo.svg.png", width=120)
+with col2:
+    st.markdown("## Buscador de Referencias OMRON")
 
 # -----------------------------
 # Panel lateral con filtros
@@ -77,13 +102,23 @@ results_display["List Price ES"] = results_display["List Price ES"].apply(
 )
 
 # -----------------------------
-# Mostrar resultados
+# Mostrar resultados con imágenes
 # -----------------------------
 st.markdown(f"### 📊 Resultados encontrados: {len(results_display)}")
 if results_display.empty:
     st.info("No se encontraron resultados para los filtros aplicados.")
 else:
-    st.dataframe(results_display, use_container_width=True)
+    for idx, row in results_display.iterrows():
+        col1, col2, col3 = st.columns([1,3,2])
+        with col1:
+            if pd.notnull(row["Primary Image Deep Link"]):
+                st.image(row["Primary Image Deep Link"], width=100)
+        with col2:
+            st.markdown(f"**{row['Catalog Description']}**")
+            st.markdown(f"OEE: {row['OEE Second Item Number']}")
+        with col3:
+            st.markdown(f"Stocking Type: {row['Stocking Type']}")
+            st.markdown(f"Price: {row['List Price ES']}")
 
 # -----------------------------
 # Botón de descarga de Excel
@@ -106,5 +141,8 @@ if not results.empty:
 # -----------------------------
 st.markdown("---")
 st.markdown(
-    "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo")
+    "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo"
+)
+
+
 

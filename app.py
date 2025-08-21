@@ -106,6 +106,3 @@ if not results.empty:
 # -----------------------------
 st.markdown("---")
 st.markdown("Hecho con ❤️ por Sales Support de Omron | Rápido y fácil de usar")
-st.markdown(
-    "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo"
-)

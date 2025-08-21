@@ -23,7 +23,7 @@ columnas_seleccionadas = [
 ]
 
 # -----------------------------
-# Cargar datos
+# Cargar datos (rápido)
 # -----------------------------
 @st.cache_data
 def load_data():
@@ -80,7 +80,10 @@ results_display["List Price ES"] = results_display["List Price ES"].apply(
 # Mostrar resultados
 # -----------------------------
 st.markdown(f"### 📊 Resultados encontrados: {len(results_display)}")
-st.dataframe(results_display, use_container_width=True)
+if results_display.empty:
+    st.info("No se encontraron resultados para los filtros aplicados.")
+else:
+    st.dataframe(results_display, use_container_width=True)
 
 # -----------------------------
 # Botón de descarga de Excel
@@ -104,5 +107,3 @@ if not results.empty:
 st.markdown("---")
 st.markdown(
     "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo"
-)
-

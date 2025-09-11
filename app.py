@@ -137,28 +137,32 @@ results_display["List Price ES"] = results_display["List Price ES"].apply(
 )
 
 # -----------------------------
-# Mostrar resultados y selección
+# Mostrar resultados y selección por OEE Second Item Number
 # -----------------------------
 st.markdown(f"### 📊 Resultados encontrados: {len(results_display)}")
 
-selected_item_code = st.selectbox(
-    "Selecciona un item para ver detalles",
-    options=results_display["Item Code"].tolist()
-)
+if not results_display.empty:
+    selected_oee = st.selectbox(
+        "Selecciona un OEE Second Item Number",
+        options=sorted(results_display["OEE Second Item Number"].unique())
+    )
 
-if selected_item_code:
-    item = results_display[results_display["Item Code"] == selected_item_code].iloc[0]
-    st.write(f"**OEE Second Item Number:** {item['OEE Second Item Number']}")
-    st.write(f"**Catalog Description:** {item['Catalog Description']}")
-    st.write(f"**Item Long Description:** {item['Item Long Description']}")
-    st.write(f"**Stocking Type:** {item['Stocking Type']}")
-    st.write(f"**Qty Immediately:** {item['Qty Immediately']}")
-    st.write(f"**Qty Future:** {item['Qty Future']}")
-    st.write(f"**List Price ES:** {item['List Price ES']}")
-    
-    # Imagen más pequeña
-    if pd.notna(item["<Primary Image.|Node|.Deep Link - 160px>"]):
-        st.image(item["<Primary Image.|Node|.Deep Link - 160px>"], width=200)
+    if selected_oee:
+        item = results_display[results_display["OEE Second Item Number"] == selected_oee].iloc[0]
+        st.write(f"**Item Code:** {item['Item Code']}")
+        st.write(f"**OEE Second Item Number:** {item['OEE Second Item Number']}")
+        st.write(f"**Catalog Description:** {item['Catalog Description']}")
+        st.write(f"**Item Long Description:** {item['Item Long Description']}")
+        st.write(f"**Stocking Type:** {item['Stocking Type']}")
+        st.write(f"**Qty Immediately:** {item['Qty Immediately']}")
+        st.write(f"**Qty Future:** {item['Qty Future']}")
+        st.write(f"**List Price ES:** {item['List Price ES']}")
+
+        # Imagen más pequeña
+        if pd.notna(item["<Primary Image.|Node|.Deep Link - 160px>"]):
+            st.image(item["<Primary Image.|Node|.Deep Link - 160px>"], width=200)
+else:
+    st.info("No se encontraron resultados con los filtros aplicados.")
 
 # -----------------------------
 # Descargar Excel

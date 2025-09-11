@@ -149,25 +149,22 @@ if available_only:
     results = results[results["Qty Immediately"] > 0]
 
 # -----------------------------
-# Formatear List Price y aplicar descuento
+# Formatear List Price y aplicar límite de descuento
 # -----------------------------
 results["List Price ES"] = pd.to_numeric(results["List Price ES"], errors='coerce')
-results["Discounted Price"] = results.apply(
-    lambda row: row["List Price ES"] * (1 - row["Sales person Limit"]/100)
-    if pd.notnull(row["Sales person Limit"]) else row["List Price ES"],
+
+# Límite de descuento y Price Limit
+results["Discount Limit"] = results["Sales person Limit"].apply(lambda x: x if pd.notnull(x) else 0)
+results["Price Limit"] = results.apply(
+    lambda row: row["List Price ES"] * (1 - row["Discount Limit"]/100) if row["Discount Limit"] > 0 else row["List Price ES"],
     axis=1
 )
 
+# Formatear para mostrar en la app
 results_display = results.copy()
-results_display["List Price ES"] = results_display["List Price ES"].apply(
-    lambda x: f"€ {x:,.2f}" if pd.notnull(x) else ""
-)
-results_display["Discounted Price"] = results_display["Discounted Price"].apply(
-    lambda x: f"€ {x:,.2f}" if pd.notnull(x) else ""
-)
-results_display["Discount %"] = results_display["Sales person Limit"].apply(
-    lambda x: f"{x:.0f}%" if pd.notnull(x) else ""
-)
+results_display["List Price ES"] = results_display["List Price ES"].apply(lambda x: f"€ {x:,.2f}" if pd.notnull(x) else "")
+results_display["Discount Limit"] = results_display["Discount Limit"].apply(lambda x: f"{x:.0f}%" if x>0 else "")
+results_display["Price Limit"] = results_display["Price Limit"].apply(lambda x: f"€ {x:,.2f}" if pd.notnull(x) else "")
 
 # -----------------------------
 # Mostrar resultados y selección
@@ -188,8 +185,8 @@ if selected_item:
     st.write(f"**Qty Immediately:** {item['Qty Immediately']}")
     st.write(f"**Qty Future:** {item['Qty Future']}")
     st.write(f"**List Price ES:** {item['List Price ES']}")
-    st.write(f"**Discount %:** {item['Discount %']}")
-    st.write(f"**Discounted Price:** {item['Discounted Price']}")
+    st.write(f"**Discount Limit:** {item['Discount Limit']}")
+    st.write(f"**Price Limit:** {item['Price Limit']}")
     
     if pd.notna(item["<Primary Image.|Node|.Deep Link - 160px>"]):
         st.image(item["<Primary Image.|Node|.Deep Link - 160px>"], width=200)
@@ -217,4 +214,3 @@ st.markdown("---")
 st.markdown(
     "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo"
 )
-

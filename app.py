@@ -118,7 +118,7 @@ with st.sidebar:
     stocking_type_p = st.checkbox("Mostrar solo P - Omron Stocked Item")
     
     # Filtro stock disponible
-    available_only = st.checkbox("Mostrar solo stock disponible (Qty Immediately > 0)")
+    available_only = st.checkbox("Mostrar solo stock disponible")
     
     st.markdown("---")
     query = st.text_input("🔎 Búsqueda general (OEE / Catalog / Long Desc)")
@@ -217,3 +217,4 @@ st.markdown("---")
 st.markdown(
     "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo"
 )
+

@@ -9,19 +9,26 @@ ST_USERNAME = "Frodo.Baggins"
 ST_PASSWORD = "M0rd0r!R1ng$2025"
 
 def check_password():
-    if "authenticated" not in st.session_state:
-        st.session_state.authenticated = False
+    def password_entered():
+        if (st.session_state["username"] == ST_USERNAME and
+            st.session_state["password"] == ST_PASSWORD):
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]
+        else:
+            st.session_state["password_correct"] = False
 
-    if not st.session_state.authenticated:
-        username = st.text_input("Usuario")
-        password = st.text_input("Contraseña", type="password")
-        if st.button("Entrar"):
-            if username == ST_USERNAME and password == ST_PASSWORD:
-                st.session_state.authenticated = True
-            else:
-                st.error("Usuario o contraseña incorrectos")
+    if "password_correct" not in st.session_state:
+        st.session_state["password_correct"] = False
+
+    if not st.session_state["password_correct"]:
+        st.text_input("Usuario", key="username")
+        st.text_input("Contraseña", type="password", key="password")
+        st.button("Ingresar", on_click=password_entered)
+        if st.session_state.get("password_correct") == False and "password" in st.session_state:
+            st.error("Usuario o contraseña incorrectos")
         return False
-    return True
+    else:
+        return True
 
 if not check_password():
     st.stop()
@@ -35,16 +42,14 @@ st.set_page_config(
     page_icon="Logo-Omron-500x283 - Copy.jpg"
 )
 
-# Icono dentro de la app
-st.image("Logo-Omron-500x283 - Copy.jpg", width=150)
-
 # -----------------------------
 # Archivos y columnas
 # -----------------------------
-FILE_NAME = "BBDD REFERENCIAS 2025 AGOSTO.xlsx"
+REF_FILE = "BBDD REFERENCIAS 2025 AGOSTO.xlsx"
 STOCK_FILE = "BBDD Stocks.xlsx"
 
-columnas_seleccionadas = [
+ref_columns = [
+    "Item Code",
     "OEE Second Item Number",
     "Catalog Description",
     "Item Long Description",
@@ -64,7 +69,7 @@ stock_columns = [
 # -----------------------------
 @st.cache_data
 def load_data():
-    df_ref = pd.read_excel(FILE_NAME, usecols=columnas_seleccionadas)
+    df_ref = pd.read_excel(REF_FILE, usecols=ref_columns)
     df_stock = pd.read_excel(STOCK_FILE, usecols=stock_columns)
 
     df_stock.rename(columns={
@@ -75,10 +80,9 @@ def load_data():
     df_merged = df_ref.merge(
         df_stock,
         how="left",
-        left_on="OEE Second Item Number",
+        left_on="Item Code",
         right_on="OC Product Code"
     )
-
     df_merged.drop(columns=["OC Product Code"], inplace=True)
     return df_merged
 
@@ -89,14 +93,17 @@ df = load_data()
 # -----------------------------
 with st.sidebar:
     st.header("Filtros de búsqueda")
+    
     oee_filter = st.text_input("OEE Second Item Number")
     catalog_filter = st.text_input("Catalog Description")
+    long_desc_filter = st.text_input("Item Long Description")
     stocking_filter = st.multiselect(
         "Stocking Type",
         options=sorted(df["Stocking Type"].dropna().unique())
     )
+    
     st.markdown("---")
-    query = st.text_input("🔎 Búsqueda general (OEE / Descripción / Item Long Description)")
+    query = st.text_input("🔎 Búsqueda general (OEE / Catalog / Long Desc)")
 
 # -----------------------------
 # Filtrado de datos
@@ -107,6 +114,8 @@ if oee_filter:
     results = results[results["OEE Second Item Number"].astype(str).str.contains(oee_filter, case=False, na=False)]
 if catalog_filter:
     results = results[results["Catalog Description"].astype(str).str.contains(catalog_filter, case=False, na=False)]
+if long_desc_filter:
+    results = results[results["Item Long Description"].astype(str).str.contains(long_desc_filter, case=False, na=False)]
 if stocking_filter:
     results = results[results["Stocking Type"].isin(stocking_filter)]
 if query:
@@ -125,32 +134,31 @@ results_display["List Price ES"] = results_display["List Price ES"].apply(
 )
 
 # -----------------------------
-# Selección de fila
+# Mostrar resultados y selección
 # -----------------------------
 st.markdown(f"### 📊 Resultados encontrados: {len(results_display)}")
-selected_item = st.selectbox("Selecciona un item para ver detalles", results_display["OEE Second Item Number"].astype(str))
 
-if selected_item:
-    item_data = results_display[results_display["OEE Second Item Number"].astype(str) == selected_item].iloc[0]
-    st.write("**OEE Second Item Number:**", item_data["OEE Second Item Number"])
-    st.write("**Catalog Description:**", item_data["Catalog Description"])
-    st.write("**Item Long Description:**", item_data["Item Long Description"])
-    st.write("**List Price ES:**", item_data["List Price ES"])
-    st.write("**Stocking Type:**", item_data["Stocking Type"])
-    st.write("**Qty Immediately:**", item_data.get("Qty Immediately", "N/A"))
-    st.write("**Qty Future:**", item_data.get("Qty Future", "N/A"))
+selected_item_code = st.selectbox(
+    "Selecciona un item para ver detalles",
+    options=results_display["Item Code"].tolist()
+)
 
+if selected_item_code:
+    item = results_display[results_display["Item Code"] == selected_item_code].iloc[0]
+    st.write(f"**OEE Second Item Number:** {item['OEE Second Item Number']}")
+    st.write(f"**Catalog Description:** {item['Catalog Description']}")
+    st.write(f"**Item Long Description:** {item['Item Long Description']}")
+    st.write(f"**Stocking Type:** {item['Stocking Type']}")
+    st.write(f"**Qty Immediately:** {item['Qty Immediately']}")
+    st.write(f"**Qty Future:** {item['Qty Future']}")
+    st.write(f"**List Price ES:** {item['List Price ES']}")
+    
     # Imagen más pequeña
-    if pd.notnull(item_data["<Primary Image.|Node|.Deep Link - 160px>"]):
-        st.image(item_data["<Primary Image.|Node|.Deep Link - 160px>"], width=200)
+    if pd.notna(item["<Primary Image.|Node|.Deep Link - 160px>"]):
+        st.image(item["<Primary Image.|Node|.Deep Link - 160px>"], width=200)
 
 # -----------------------------
-# Mostrar tabla completa
-# -----------------------------
-st.dataframe(results_display, use_container_width=True)
-
-# -----------------------------
-# Botón de descarga
+# Descargar Excel
 # -----------------------------
 if not results.empty:
     output = BytesIO()
@@ -166,7 +174,9 @@ if not results.empty:
     )
 
 # -----------------------------
-# Footer corporativo
+# Footer
 # -----------------------------
 st.markdown("---")
-st.markdown("Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo")
+st.markdown(
+    "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo"
+)

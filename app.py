@@ -42,6 +42,9 @@ st.set_page_config(
     page_icon="Logo-Omron-500x283 - Copy.jpg"
 )
 
+# Mostrar el icono dentro de la app
+st.image("Logo-Omron-500x283 - Copy.jpg", width=150)
+
 # -----------------------------
 # Archivos y columnas
 # -----------------------------

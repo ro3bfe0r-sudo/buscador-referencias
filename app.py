@@ -42,14 +42,12 @@ st.set_page_config(
     page_icon="Logo-Omron-500x283 - Copy.jpg"
 )
 
-# Mostrar el icono dentro de la app
-st.image("Logo-Omron-500x283 - Copy.jpg", width=150)
-
 # -----------------------------
 # Archivos y columnas
 # -----------------------------
 REF_FILE = "BBDD REFERENCIAS 2025 AGOSTO.xlsx"
 STOCK_FILE = "BBDD Stocks.xlsx"
+NSC_FILE = "NSC Discount Limit Report for NSC Admin-2025-09-11-14-43-13.xlsx"
 
 ref_columns = [
     "Item Code",
@@ -58,13 +56,20 @@ ref_columns = [
     "Item Long Description",
     "List Price ES",
     "Stocking Type",
-    "<Primary Image.|Node|.Deep Link - 160px>"
+    "<Primary Image.|Node|.Deep Link - 160px>",
+    "<Discount Link.|Node|.Discount - Level 3 - Family>"
 ]
 
 stock_columns = [
     "OC Product Code",
     "Quantity Immediately Available",
     "Quantity Future Available"
+]
+
+nsc_columns = [
+    "Discount Group",
+    "Discount Group Description",
+    "Sales person Limit"
 ]
 
 # -----------------------------
@@ -74,12 +79,14 @@ stock_columns = [
 def load_data():
     df_ref = pd.read_excel(REF_FILE, usecols=ref_columns)
     df_stock = pd.read_excel(STOCK_FILE, usecols=stock_columns)
+    df_nsc = pd.read_excel(NSC_FILE, usecols=nsc_columns)
 
     df_stock.rename(columns={
         "Quantity Immediately Available": "Qty Immediately",
         "Quantity Future Available": "Qty Future"
     }, inplace=True)
 
+    # Merge referencias con stock
     df_merged = df_ref.merge(
         df_stock,
         how="left",
@@ -87,7 +94,15 @@ def load_data():
         right_on="OC Product Code"
     )
     df_merged.drop(columns=["OC Product Code"], inplace=True)
-    return df_merged
+
+    # Merge con NSC (descuentos)
+    df_final = df_merged.merge(
+        df_nsc,
+        how="left",
+        left_on="<Discount Link.|Node|.Discount - Level 3 - Family>",
+        right_on="Discount Group"
+    )
+    return df_final
 
 df = load_data()
 
@@ -100,12 +115,10 @@ with st.sidebar:
     oee_filter = st.text_input("OEE Second Item Number")
     catalog_filter = st.text_input("Catalog Description")
     long_desc_filter = st.text_input("Item Long Description")
-    
-    # Checkbox para filtrar por Stocking Type
-    p_omron_only = st.checkbox("Mostrar solo P - Omron Stocked Item")
-    
-    # Checkbox para filtrar por stock disponible
-    only_available = st.checkbox("Mostrar solo referencias con stock disponible")
+    stocking_filter = st.multiselect(
+        "Stocking Type",
+        options=sorted(df["Stocking Type"].dropna().unique())
+    )
     
     st.markdown("---")
     query = st.text_input("🔎 Búsqueda general (OEE / Catalog / Long Desc)")
@@ -121,15 +134,8 @@ if catalog_filter:
     results = results[results["Catalog Description"].astype(str).str.contains(catalog_filter, case=False, na=False)]
 if long_desc_filter:
     results = results[results["Item Long Description"].astype(str).str.contains(long_desc_filter, case=False, na=False)]
-
-# Filtrado por P - Omron Stocked Item
-if p_omron_only:
-    results = results[results["Stocking Type"] == "P - Omron Stocked Item"]
-
-# Filtrado por stock disponible
-if only_available:
-    results = results[results["Qty Immediately"].fillna(0) > 0]
-
+if stocking_filter:
+    results = results[results["Stocking Type"].isin(stocking_filter)]
 if query:
     mask_oee = results["OEE Second Item Number"].astype(str).str.contains(query, case=False, na=False)
     mask_catalog = results["Catalog Description"].astype(str).str.contains(query, case=False, na=False)
@@ -137,41 +143,54 @@ if query:
     results = results[mask_oee | mask_catalog | mask_long]
 
 # -----------------------------
-# Formatear List Price
+# Calcular descuentos
 # -----------------------------
 results["List Price ES"] = pd.to_numeric(results["List Price ES"], errors='coerce')
+results["Discount Limit (%)"] = pd.to_numeric(results["Sales person Limit"], errors='coerce')
+
+results["Precio con descuento (€)"] = results.apply(
+    lambda row: row["List Price ES"] * (1 - row["Discount Limit (%)"]/100)
+    if pd.notnull(row["List Price ES"]) and pd.notnull(row["Discount Limit (%)"]) else None,
+    axis=1
+)
+
+# Copia para display con formato bonito
 results_display = results.copy()
 results_display["List Price ES"] = results_display["List Price ES"].apply(
     lambda x: f"€ {x:,.2f}" if pd.notnull(x) else ""
 )
+results_display["Discount Limit (%)"] = results_display["Discount Limit (%)"].apply(
+    lambda x: f"{x:.0f}%" if pd.notnull(x) else ""
+)
+results_display["Precio con descuento (€)"] = results_display["Precio con descuento (€)"].apply(
+    lambda x: f"€ {x:,.2f}" if pd.notnull(x) else ""
+)
 
 # -----------------------------
-# Mostrar resultados y selección por OEE Second Item Number
+# Mostrar resultados y selección
 # -----------------------------
 st.markdown(f"### 📊 Resultados encontrados: {len(results_display)}")
 
-if not results_display.empty:
-    selected_oee = st.selectbox(
-        "Selecciona un OEE Second Item Number",
-        options=sorted(results_display["OEE Second Item Number"].unique())
-    )
+selected_item_code = st.selectbox(
+    "Selecciona un item para ver detalles",
+    options=results_display["Item Code"].tolist()
+)
 
-    if selected_oee:
-        item = results_display[results_display["OEE Second Item Number"] == selected_oee].iloc[0]
-        st.write(f"**Item Code:** {item['Item Code']}")
-        st.write(f"**OEE Second Item Number:** {item['OEE Second Item Number']}")
-        st.write(f"**Catalog Description:** {item['Catalog Description']}")
-        st.write(f"**Item Long Description:** {item['Item Long Description']}")
-        st.write(f"**Stocking Type:** {item['Stocking Type']}")
-        st.write(f"**Qty Immediately:** {item['Qty Immediately']}")
-        st.write(f"**Qty Future:** {item['Qty Future']}")
-        st.write(f"**List Price ES:** {item['List Price ES']}")
+if selected_item_code:
+    item = results_display[results_display["Item Code"] == selected_item_code].iloc[0]
 
-        # Imagen más pequeña
-        if pd.notna(item["<Primary Image.|Node|.Deep Link - 160px>"]):
-            st.image(item["<Primary Image.|Node|.Deep Link - 160px>"], width=200)
-else:
-    st.info("No se encontraron resultados con los filtros aplicados.")
+    st.write(f"**OEE Second Item Number:** {item['OEE Second Item Number']}")
+    st.write(f"**Catalog Description:** {item['Catalog Description']}")
+    st.write(f"**Item Long Description:** {item['Item Long Description']}")
+    st.write(f"**Stocking Type:** {item['Stocking Type']}")
+    st.write(f"**Qty Immediately:** {item['Qty Immediately']}")
+    st.write(f"**Qty Future:** {item['Qty Future']}")
+    st.write(f"**List Price ES:** {item['List Price ES']}")
+    st.write(f"**Discount Limit:** {item['Discount Limit (%)']}")
+    st.write(f"**Precio con descuento:** {item['Precio con descuento (€)']}")
+
+    if pd.notna(item["<Primary Image.|Node|.Deep Link - 160px>"]):
+        st.image(item["<Primary Image.|Node|.Deep Link - 160px>"], width=200)
 
 # -----------------------------
 # Descargar Excel

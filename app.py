@@ -100,10 +100,12 @@ with st.sidebar:
     oee_filter = st.text_input("OEE Second Item Number")
     catalog_filter = st.text_input("Catalog Description")
     long_desc_filter = st.text_input("Item Long Description")
-    stocking_filter = st.multiselect(
-        "Stocking Type",
-        options=sorted(df["Stocking Type"].dropna().unique())
-    )
+    
+    # Checkbox para filtrar por Stocking Type
+    p_omron_only = st.checkbox("Mostrar solo P - Omron Stocked Item")
+    
+    # Checkbox para filtrar por stock disponible
+    only_available = st.checkbox("Mostrar solo referencias con stock disponible")
     
     st.markdown("---")
     query = st.text_input("🔎 Búsqueda general (OEE / Catalog / Long Desc)")
@@ -119,8 +121,15 @@ if catalog_filter:
     results = results[results["Catalog Description"].astype(str).str.contains(catalog_filter, case=False, na=False)]
 if long_desc_filter:
     results = results[results["Item Long Description"].astype(str).str.contains(long_desc_filter, case=False, na=False)]
-if stocking_filter:
-    results = results[results["Stocking Type"].isin(stocking_filter)]
+
+# Filtrado por P - Omron Stocked Item
+if p_omron_only:
+    results = results[results["Stocking Type"] == "P - Omron Stocked Item"]
+
+# Filtrado por stock disponible
+if only_available:
+    results = results[results["Qty Immediately"].fillna(0) > 0]
+
 if query:
     mask_oee = results["OEE Second Item Number"].astype(str).str.contains(query, case=False, na=False)
     mask_catalog = results["Catalog Description"].astype(str).str.contains(query, case=False, na=False)

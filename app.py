@@ -133,7 +133,14 @@ if oee_filter:
 if catalog_filter:
     results = results[results["Catalog Description"].astype(str).str.contains(catalog_filter, case=False, na=False)]
 if long_desc_filter:
-    results = results[results["Item Long Description"].astype(str).str.contains(long_desc_filter, case=False, na=False)]
+    # Separar palabras por espacio
+    palabras = long_desc_filter.split()
+    # Crear una máscara que sea True si contiene todas las palabras
+    mask = results["Item Long Description"].astype(str).apply(
+        lambda desc: all(palabra.lower() in desc.lower() for palabra in palabras)
+    )
+    results = results[mask]
+
 if query:
     mask_oee = results["OEE Second Item Number"].astype(str).str.contains(query, case=False, na=False)
     mask_catalog = results["Catalog Description"].astype(str).str.contains(query, case=False, na=False)
@@ -214,3 +221,4 @@ st.markdown("---")
 st.markdown(
     "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo"
 )
+

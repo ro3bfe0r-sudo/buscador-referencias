@@ -84,7 +84,6 @@ def load_data():
         "Quantity Future Available": "Qty Future"
     }, inplace=True)
 
-    # Merge stock con referencias
     df_merged = df_ref.merge(
         df_stock,
         how="left",
@@ -93,7 +92,6 @@ def load_data():
     )
     df_merged.drop(columns=["OC Product Code"], inplace=True)
 
-    # Merge NSC Discount
     df_merged = df_merged.merge(
         df_nsc,
         how="left",
@@ -114,10 +112,7 @@ with st.sidebar:
     catalog_filter = st.text_input("Catalog Description")
     long_desc_filter = st.text_input("Item Long Description")
     
-    # Filtro Stocking Type
     stocking_type_p = st.checkbox("Mostrar solo P - Omron Stocked Item")
-    
-    # Filtro stock disponible
     available_only = st.checkbox("Mostrar solo stock disponible")
     
     st.markdown("---")
@@ -133,9 +128,7 @@ if oee_filter:
 if catalog_filter:
     results = results[results["Catalog Description"].astype(str).str.contains(catalog_filter, case=False, na=False)]
 if long_desc_filter:
-    # Separar palabras por espacio
     palabras = long_desc_filter.split()
-    # Crear una máscara que sea True si contiene todas las palabras
     mask = results["Item Long Description"].astype(str).apply(
         lambda desc: all(palabra.lower() in desc.lower() for palabra in palabras)
     )
@@ -147,11 +140,9 @@ if query:
     mask_long = results["Item Long Description"].astype(str).str.contains(query, case=False, na=False)
     results = results[mask_oee | mask_catalog | mask_long]
 
-# Aplicar filtro Stocking Type si marcado
 if stocking_type_p:
     results = results[results["Stocking Type"] == "P - Omron Stocked Item"]
 
-# Filtrar solo stock disponible si marcado
 if available_only:
     results = results[results["Qty Immediately"] > 0]
 
@@ -159,22 +150,19 @@ if available_only:
 # Formatear List Price y aplicar límite de descuento
 # -----------------------------
 results["List Price ES"] = pd.to_numeric(results["List Price ES"], errors='coerce')
-
-# Límite de descuento y Price Limit
 results["Discount Limit"] = results["Sales person Limit"].apply(lambda x: x if pd.notnull(x) else 0)
 results["Price Limit"] = results.apply(
     lambda row: row["List Price ES"] * (1 - row["Discount Limit"]/100) if row["Discount Limit"] > 0 else row["List Price ES"],
     axis=1
 )
 
-# Formatear para mostrar en la app
 results_display = results.copy()
 results_display["List Price ES"] = results_display["List Price ES"].apply(lambda x: f"€ {x:,.2f}" if pd.notnull(x) else "")
 results_display["Discount Limit"] = results_display["Discount Limit"].apply(lambda x: f"{x:.0f}%" if x>0 else "")
 results_display["Price Limit"] = results_display["Price Limit"].apply(lambda x: f"€ {x:,.2f}" if pd.notnull(x) else "")
 
 # -----------------------------
-# Mostrar resultados y selección
+# Mostrar resultados y selección de item
 # -----------------------------
 st.markdown(f"### 📊 Resultados encontrados: {len(results_display)}")
 
@@ -194,12 +182,50 @@ if selected_item:
     st.write(f"**List Price ES:** {item['List Price ES']}")
     st.write(f"**Discount Limit:** {item['Discount Limit']}")
     st.write(f"**Price Limit:** {item['Price Limit']}")
-    
     if pd.notna(item["<Primary Image.|Node|.Deep Link - 160px>"]):
         st.image(item["<Primary Image.|Node|.Deep Link - 160px>"], width=200)
 
 # -----------------------------
-# Descargar Excel
+# Carrito de selección (varios items)
+# -----------------------------
+st.markdown("### 🛒 Añadir item al carrito")
+
+if "seleccion_items" not in st.session_state:
+    st.session_state.seleccion_items = pd.DataFrame(columns=["Item Code", "Quantity", "Discount"])
+
+if selected_item:
+    col1, col2, col3, col4 = st.columns([3,2,2,1])
+    with col1:
+        st.write(f"{item['Item Code']} - {item['Catalog Description']}")
+    with col2:
+        qty = st.number_input(f"Cantidad {item['Item Code']}", min_value=0, value=0, key=f"qty_{item['Item Code']}")
+    with col3:
+        disc = st.number_input(f"Descuento % {item['Item Code']}", min_value=0.0, max_value=100.0, value=0.0, step=0.5, key=f"disc_{item['Item Code']}")
+    with col4:
+        if st.button("Añadir", key=f"add_{item['Item Code']}") and qty > 0:
+            st.session_state.seleccion_items.loc[item['Item Code']] = [item['Item Code'], qty, disc]
+            st.success(f"{item['Item Code']} añadido al carrito")
+
+# Mostrar carrito actual
+if not st.session_state.seleccion_items.empty:
+    st.markdown("### 📝 Carrito actual")
+    st.dataframe(st.session_state.seleccion_items)
+
+    # Descargar selección de items
+    output_sel = BytesIO()
+    with pd.ExcelWriter(output_sel, engine='xlsxwriter') as writer:
+        st.session_state.seleccion_items.to_excel(writer, index=False, sheet_name='Selección')
+    output_sel.seek(0)
+
+    st.download_button(
+        label="📥 Descargar selección de items",
+        data=output_sel,
+        file_name="Seleccion_Items.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
+
+# -----------------------------
+# Descargar Excel de resultados filtrados
 # -----------------------------
 if not results.empty:
     output = BytesIO()
@@ -221,4 +247,3 @@ st.markdown("---")
 st.markdown(
     "Hecho con ❤️ por **Sales Support de Omron** | Rápido, fácil y corporativo"
 )
-
